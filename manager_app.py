@@ -153,7 +153,9 @@ def main():
 
         4. **Simple Yet Powerful Imputation**: Dive into foundational methods like Median, Mean, or Mode imputation. Depending on the nuances of your dataset and your analytical aspirations, sometimes simplicity is the key.
 
-        Once you've set everything, sit back and let us refine your data. But that's not all – our integrated visualization suite provides instant insights into the heart of your cleaned dataset. Embark on a data cleaning journey like never before!
+        Once you've set everything, sit back and let us refine your data. But that's not all – our integrated visualization suite provides instant insights into the heart of your cleaned dataset. Embark on a data cleaning journey like never before! 
+             
+        Application by Oburoh
         """)
 
     # Load data
