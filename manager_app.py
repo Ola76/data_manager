@@ -2,11 +2,12 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import numpy as np
-import base64
 import os
 import matplotlib.pyplot as plt
 import base64
 import io
+import json
+from streamlit_lottie import st_lottie
 from datetime import datetime
 from tabula import read_pdf
 from scipy.stats import mstats
@@ -15,6 +16,9 @@ from sklearn.impute import KNNImputer, IterativeImputer
 from fpdf import FPDF
 from io import BytesIO
 
+def load_lottiefile(filepath: str):
+    with open (filepath, "r") as f:
+        return json.load(f)
 
 # Function to check the provided credentials.
 def check_credentials(username, password):
@@ -22,7 +26,7 @@ def check_credentials(username, password):
         return True
     return False
 
-@st.cache(allow_output_mutation=True)
+@st.cache_data
 def load_data(file):
     file_extension = os.path.splitext(file.name)[1].lower()
     if file_extension == ".csv":
@@ -56,6 +60,7 @@ def load_data(file):
         st.error("Unsupported file format!")
         return None
 
+@st.cache_data
 def clean_categorical_data(df):
     # Select only the categorical columns
     cat_columns = df.select_dtypes(['object']).columns
@@ -70,6 +75,7 @@ def clean_categorical_data(df):
         df[col] = df[col].str.replace('[^a-zA-Z0-9]', '', regex=True)
     return df
 
+@st.cache_data
 def handle_outliers(df, method="winsorize", limits=(0.01, 0.01)):
     numeric_cols = df.select_dtypes(include=[np.number]).columns
     if method == "winsorize":
@@ -81,6 +87,7 @@ def handle_outliers(df, method="winsorize", limits=(0.01, 0.01)):
     
     return df
 
+@st.cache_data
 def advanced_imputation(df, method="KNN"):
     numeric_df = df.select_dtypes(include=[np.number])  # Extract numeric columns
     st.markdown('<span title="KNN (K-Nearest Neighbors) imputer replaces missing values using the mean value of k nearest neighbors.">KNN 🛈</span>', unsafe_allow_html=True)
@@ -96,6 +103,7 @@ def advanced_imputation(df, method="KNN"):
         df[numeric_df.columns] = imputed_data  # Update only numeric columns with imputed data
     return df
 
+@st.cache_data
 def clean_data(df, method):
     if method == "Median":
         return df.fillna(df.median(numeric_only=True))
@@ -154,7 +162,7 @@ def main():
         4. **Simple Yet Powerful Imputation**: Dive into foundational methods like Median, Mean, or Mode imputation. Depending on the nuances of your dataset and your analytical aspirations, sometimes simplicity is the key.
 
         Once you've set everything, sit back and let us refine your data. But that's not all – our integrated visualization suite provides instant insights into the heart of your cleaned dataset. Embark on a data cleaning journey like never before! 
-             
+        
         Application by Oburoh
         """)
 
@@ -228,114 +236,152 @@ def main():
         st.write("The shape of the data: Column 1, Row 0")
         st.table(df.shape)
 
-        # ... Categorical Data Visualization
-        st.title("Categorical Data")
-        st.markdown("""
-        Categorical data refers to variables that can be divided into multiple categories but do not have any order or priority. They are often non-numeric and represent characteristics such as gender, ethnicity, or regions. Unlike numeric data, they usually take on limited, and typically fixed, numbers of possible values (referred to as 'categories' or 'levels'). Understanding these variables is crucial as they can provide qualitative insights and can be encoded to numeric form for various analyses and machine learning tasks.
-        """)
+        st.markdown("**Let's Begin Data Visualization!**")
+        lottie_coding = load_lottiefile("amine.json")
+        st_lottie(lottie_coding, speed=1, loop=True, quality="low")
 
-        # Filter categorical columns
-        categorical_columns = df.select_dtypes(include=['object']).columns.tolist()
-        if categorical_columns:
-            selected_cat_column = st.selectbox("Select a categorical column", categorical_columns)
-        # Plot bar graph for the selected column using Plotly
-            fig = px.bar(df, x=selected_cat_column, title=f'Bar Chart of {selected_cat_column}')
-            st.plotly_chart(fig)
-        else:
-            st.write("No categorical columns found in the dataset.")
-        
-        # ... Numeric Data Visualization
-        st.title("Numeric Data")
-        st.markdown("""
-        Numeric data refers to variables that contain numerical values. These are typically represented by **integers** (`int`) and **floating-point numbers** (`float`). The distinction is important because numerical operations, analyses, or visualizations can be applied to these data types. Their numeric nature aids in obtaining meaningful insights and conducting quantitative analysis.
-        """)
+        @st.cache_data
+        def get_categorical_columns(df):
+            return df.select_dtypes(include=['object']).columns.tolist()
 
-        # Filter numeric columns
-        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
-        if numeric_columns:
-            selected_num_column = st.selectbox("Select a numeric column", numeric_columns)
-            # Plot frequency distribution for the selected numeric column using Plotly
-            fig = px.histogram(df, x=selected_num_column, marginal='box', title=f'Distribution of {selected_num_column}')
-            st.plotly_chart(fig)
-        else:
-            st.write("No numeric columns found in the dataset.")
+        with st.expander("Categorical Data"):
+            # ... Categorical Data Visualization
+            st.title("Categorical Data")
+            st.markdown("""
+            Categorical data refers to variables that can be divided into multiple categories but do not have any order or priority. They are often non-numeric and represent characteristics such as gender, ethnicity, or regions. Unlike numeric data, they usually take on limited, and typically fixed, numbers of possible values (referred to as 'categories' or 'levels'). Understanding these variables is crucial as they can provide qualitative insights and can be encoded to numeric form for various analyses and machine learning tasks.
+            """)
 
-        st.title("FacetGrid Visualization")
-        st.markdown("""
-            FacetGrid visualization provides a way to visualize the distribution or relationship of data separately within subsets. This can be particularly useful when you want to explore the variation of data across different categories or levels of a certain feature.
-        """)
-        # Choose the variable for faceting
-        facet_variable = st.selectbox("Select a variable for faceting", df.columns)
-        numeric_columns_without_facet = [col for col in numeric_columns if col != facet_variable]
-
-        # Ensure that the chosen facet variable has more than one unique value and less than a certain threshold (e.g., 20 for performance reasons)
-        if 1 < df[facet_variable].nunique() <= 20:
-            # Choose a variable for the x-axis
-            x_variable = st.selectbox("Select a variable for the x-axis", numeric_columns_without_facet)
-            # Generate the FacetGrid-like plot
-            try:
-                facet_fig = px.histogram(df, 
-                                x=x_variable,
-                                facet_col=facet_variable,
-                                title=f"Distribution of {x_variable} by {facet_variable}"
-                                    )
-                st.plotly_chart(facet_fig)
-            except Exception as e:
-                st.warning(f"An error occurred: {e}. The selected features cannot be plotted.")
-        else:
-            st.warning("The selected variable for faceting is not suitable. Please choose another one.")
-
-        st.title("Custom Visualization")
-        st.markdown("""
-            This section allows you to visualize the dataset based on your chart preferences. You can explore different chart types based on the feature selected.
-        """)
-
-        # Select feature
-        feature_to_plot = st.selectbox("Select a feature for visualization", df.columns)
-
-        # Define a threshold for unique value counts
-        unique_threshold = 20  
-
-        # Check if the selected feature is numeric or categorical
-        if df[feature_to_plot].dtype in [np.number]:
-            # Check if numeric feature has limited unique values
-            if df[feature_to_plot].nunique() <= unique_threshold:
-                st.warning(f"The feature '{feature_to_plot}' has a limited number of unique values and might not be ideal for scatter plots.")
-                chart_type = st.selectbox("Select chart type", ["Histogram", "Box Plot", "Line Chart", "Pie Chart"])
+            # Use the cached function to get categorical columns
+            categorical_columns = get_categorical_columns(df)
+    
+            if categorical_columns:
+                selected_cat_column = st.selectbox("Select a categorical column", categorical_columns)
+                fig = px.bar(df, x=selected_cat_column, title=f'Bar Chart of {selected_cat_column}')
+                st.plotly_chart(fig)
             else:
-                chart_type = st.selectbox("Select chart type", ["Histogram", "Box Plot", "Line Chart", "Scatter Plot", "Pie Chart"])
+                st.write("No categorical columns found in the dataset.")
+    
+        @st.cache_data
+        def get_numeric_columns(df):
+            return df.select_dtypes(include=[np.number]).columns.tolist()
 
+        with st.expander("Numeric Data"):
+            # ... Numeric Data Visualization
+            st.title("Numeric Data")
+            st.markdown("""
+            Numeric data refers to variables that contain numerical values. These are typically represented by **integers** (`int`) and **floating-point numbers** (`float`). The distinction is important because numerical operations, analyses, or visualizations can be applied to these data types. Their numeric nature aids in obtaining meaningful insights and conducting quantitative analysis.
+            """)
+
+            # Use the cached function to get numeric columns
+            numeric_columns = get_numeric_columns(df)
+    
+            if numeric_columns:
+                selected_num_column = st.selectbox("Select a numeric column", numeric_columns)
+                fig = px.histogram(df, x=selected_num_column, marginal='box', title=f'Distribution of {selected_num_column}')
+                st.plotly_chart(fig)
+            else:
+                st.write("No numeric columns found in the dataset.")
+
+        @st.cache_data
+        def get_numeric_columns_without_facet(df, numeric_columns, facet_variable):
+            return [col for col in numeric_columns if col != facet_variable]
+
+        with st.expander("FacetGrid Data Visualization"):
+            st.title("FacetGrid Visualization")
+            st.markdown("""
+                        FacetGrid visualization provides a way to visualize the distribution or relationship of data separately within subsets. This can be particularly useful when you want to explore the variation of data across different categories or levels of a certain feature.
+                    """)
+    
+            # Choose the variable for faceting
+            facet_variable = st.selectbox("Select a variable for faceting", df.columns)
+    
+            # Use cached function
+            numeric_columns_without_facet = get_numeric_columns_without_facet(df, numeric_columns, facet_variable)
+
+            # Ensure that the chosen facet variable has more than one unique value and less than a certain threshold (e.g., 20 for performance reasons)
+            if 1 < df[facet_variable].nunique() <= 20:
+                # Choose a variable for the x-axis
+                x_variable = st.selectbox("Select a variable for the x-axis", numeric_columns_without_facet)
+        
+                # Generate the FacetGrid-like plot
+                try:
+                    facet_fig = px.histogram(df, 
+                                            x=x_variable,
+                                            facet_col=facet_variable,
+                                            title=f"Distribution of {x_variable} by {facet_variable}"
+                                                )
+                    st.plotly_chart(facet_fig)
+                except Exception as e:
+                    st.warning(f"An error occurred: {e}. The selected features cannot be plotted.")
+            else:
+                st.warning("The selected variable for faceting is not suitable. Please choose another one.")
+
+        @st.cache_data
+        def is_feature_numeric(df, feature_to_plot):
+            return df[feature_to_plot].dtype in [np.number]
+
+        @st.cache_data
+        def create_numeric_chart(df, feature_to_plot, chart_type, secondary_feature=None):
             if chart_type == "Histogram":
-                fig = px.histogram(df, x=feature_to_plot)
+                return px.histogram(df, x=feature_to_plot)
             elif chart_type == "Box Plot":
-                fig = px.box(df, y=feature_to_plot)
+                return px.box(df, y=feature_to_plot)
             elif chart_type == "Line Chart":
-                fig = px.line(df, y=feature_to_plot)
+                return px.line(df, y=feature_to_plot)
             elif chart_type == "Scatter Plot":
-                secondary_feature = st.selectbox("Select feature for y-axis", [col for col in df.columns if col != feature_to_plot])
-                fig = px.scatter(df, x=feature_to_plot, y=secondary_feature)
-            elif chart_type == "Pie Chart":
-                st.warning("Pie charts are not suitable for numeric features.")
-                fig = None
-            if fig:
-                st.plotly_chart(fig)
-        else:
-            # List of chart types for categorical data
-            chart_type = st.selectbox("Select chart type", ["Bar Chart", "Pie Chart"])
+                return px.scatter(df, x=feature_to_plot, y=secondary_feature)
+            else:
+                return None
+
+        @st.cache_data
+        def create_categorical_chart(df, feature_to_plot, chart_type):
             if chart_type == "Bar Chart":
-                fig = px.bar(df, x=feature_to_plot)
+                return px.bar(df, x=feature_to_plot)
             elif chart_type == "Pie Chart":
-                fig = px.pie(df, names=feature_to_plot)
+                return px.pie(df, names=feature_to_plot)
+            else:
+                return None
+
+        with st.expander("Custom Data Visualization"):
+            st.title("Custom Visualization")
+            st.markdown("""
+                        This section allows you to visualize the dataset based on your chart preferences. You can explore different chart types based on the feature selected.
+                    """)
+            feature_to_plot = st.selectbox("Select a feature for visualization", df.columns)
+            unique_threshold = 20  
+
+            if is_feature_numeric(df, feature_to_plot):
+                if df[feature_to_plot].nunique() <= unique_threshold:
+                    st.warning(f"The feature '{feature_to_plot}' has a limited number of unique values and might not be ideal for scatter plots.")
+                    chart_type = st.selectbox("Select chart type", ["Histogram", "Box Plot", "Line Chart", "Pie Chart"])
+                else:
+                    chart_type = st.selectbox("Select chart type", ["Histogram", "Box Plot", "Line Chart", "Scatter Plot", "Pie Chart"])
+
+                if chart_type == "Scatter Plot":
+                    secondary_feature = st.selectbox("Select feature for y-axis", [col for col in df.columns if col != feature_to_plot])
+                else:
+                    secondary_feature = None
+
+                fig = create_numeric_chart(df, feature_to_plot, chart_type, secondary_feature)
+            else:
+                chart_type = st.selectbox("Select chart type", ["Bar Chart", "Pie Chart"])
+                fig = create_categorical_chart(df, feature_to_plot, chart_type)
+    
             if fig:
                 st.plotly_chart(fig)
+
+
+        @st.cache_data
+        def compute_correlation_matrix(df, numeric_columns):
+            return df[numeric_columns].corr()
 
         st.title("Correlation Heatmap")
         st.markdown("""
             A correlation heatmap visualizes the correlation coefficients for different variables in a matrix format. This can be especially useful to understand the relationships between different features in the dataset.
         """)
 
-        # Calculate correlations
-        correlation_matrix = df[numeric_columns].corr()
+        # Use the cached function to get the correlation matrix
+        correlation_matrix = compute_correlation_matrix(df, numeric_columns)
 
         # Plot heatmap
         heatmap_fig = px.imshow(correlation_matrix, 
@@ -346,25 +392,31 @@ def main():
                                 )
         st.plotly_chart(heatmap_fig)
 
+        @st.cache_data
+        def process_time_features(df, selected_date_col):
+            df = df.copy()  # Clone the dataframe to avoid in-place modifications
+            df['Day'] = df[selected_date_col].dt.day
+            df['Month'] = df[selected_date_col].dt.month
+            df['Month-Year'] = df[selected_date_col].dt.to_period('M')
+            df['Year'] = df[selected_date_col].dt.year
+            return df
+
         # Checking if there's a datetime column in the dataset
         date_cols = df.select_dtypes(include=[np.datetime64]).columns.tolist()
 
         if date_cols:
             if st.button("Time Series Analysis"):
-                    
-                # If the datetime column is not of type datetime64, convert it
+            
+                # Ensure columns are of type datetime64
                 for col in date_cols:
                     df[col] = pd.to_datetime(df[col])
 
-                # Extract day, month, month-year, and year features
+                # Extract day, month, month-year, and year features using the cached function
                 selected_date_col = st.selectbox("Select a datetime column for analysis", date_cols)
-                df['Day'] = df[selected_date_col].dt.day
-                df['Month'] = df[selected_date_col].dt.month
-                df['Month-Year'] = df[selected_date_col].dt.to_period('M')
-                df['Year'] = df[selected_date_col].dt.year
+                df = process_time_features(df, selected_date_col)
 
                 time_feature = st.selectbox("Select a time feature for visualization", ["Day", "Month", "Month-Year", "Year"])
-        
+
                 # Line graph visualization
                 fig = px.line(df, x=selected_date_col, y=time_feature, title=f"Time Series Analysis of {time_feature}")
                 st.plotly_chart(fig)
@@ -372,31 +424,33 @@ def main():
         else:
             st.warning("No datetime column found in the dataset for time series analysis.")
 
-        # Feedback section
-        st.subheader("Provide Feedback")
-        feedback = st.text_area("Feedback:")
-        email = st.text_input("Email:")
 
-        if st.button("Submit Feedback"):
-        # Get the current timestamp
-            current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        with st.expander("Feedback"):
+            # Feedback section
+            st.subheader("Provide Feedback")
+            feedback = st.text_area("Feedback:")
+            email = st.text_input("Email:")
 
-            # Create a DataFrame with feedback data
-            feedback_data = pd.DataFrame({
-                "timestamp": [current_time],
-                "email": [email],
-                "feedback": [feedback]
-            })  
+            if st.button("Submit Feedback"):
+            # Get the current timestamp
+                current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        # If feedbacks.csv exists, append the data, otherwise create a new file
-            try:
-                existing_feedback = pd.read_csv("feedbacks.csv")
-                all_feedback = pd.concat([existing_feedback, feedback_data])
-                all_feedback.to_csv("feedbacks.csv", index=False)
-            except FileNotFoundError:
-                feedback_data.to_csv("feedbacks.csv", index=False)
+                # Create a DataFrame with feedback data
+                feedback_data = pd.DataFrame({
+                    "timestamp": [current_time],
+                    "email": [email],
+                    "feedback": [feedback]
+                })  
 
-            st.success("Thank you for your feedback!")
+            # If feedbacks.csv exists, append the data, otherwise create a new file
+                try:
+                    existing_feedback = pd.read_csv("feedbacks.csv")
+                    all_feedback = pd.concat([existing_feedback, feedback_data])
+                    all_feedback.to_csv("feedbacks.csv", index=False)
+                except FileNotFoundError:
+                    feedback_data.to_csv("feedbacks.csv", index=False)
+
+                st.success("Thank you for your feedback!")
 
 # Initialize session state for login status.
 if 'logged_in' not in st.session_state:
