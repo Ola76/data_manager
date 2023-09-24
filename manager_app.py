@@ -84,7 +84,7 @@ def handle_outliers(df, method="winsorize", limits=(0.01, 0.01)):
         
         # Provide the Winsorize explanation
         st.markdown('<span title="Winsorizing is a method to limit extreme values in the data. Values more extreme than a specified range will be replaced with the nearest boundary value.">Winsorize 🛈</span>', unsafe_allow_html=True)
-    
+
     return df
 
 @st.cache_data
@@ -163,8 +163,29 @@ def main():
 
         Once you've set everything, sit back and let us refine your data. But that's not all – our integrated visualization suite provides instant insights into the heart of your cleaned dataset. Embark on a data cleaning journey like never before! 
         
-        Application by Oburoh
+        Application by Oburoh.
         """)
+    
+    # Display the image
+    st.sidebar.image("data_b.png", caption="Version 1.0.5", use_column_width=True)
+
+    st.sidebar.subheader("New Update")
+    st.sidebar.write("""
+    1. PDF uploader
+    2. Collapsed data visualization
+    3. Cache run time
+    4. Dynamic correlation matrix
+    """)
+
+    st.sidebar.subheader("Version 1.1.1 coming soon")
+    st.sidebar.write("""
+    1. Authentication development
+    2. Dynamic feedback loop
+    3. Machine learning models
+    4. Prediction and Validation
+    """)
+
+    st.sidebar.write("Many more to come.")
 
     # Load data
     uploaded_file = st.file_uploader("Choose a file")
@@ -227,14 +248,19 @@ def main():
         csv_href = create_download_link(df, "csv")
         csv_button = f'<a href="{csv_href}" download="cleaned_data.csv" class="btn btn-outline-primary btn-sm">Download Cleaned Data as CSV</a>'
 
+        st.markdown(csv_button, unsafe_allow_html=True)
+
         pdf_href = create_download_link(df, "pdf")
         pdf_button = f'<a href="{pdf_href}" download="cleaned_data.pdf" class="btn btn-outline-secondary btn-sm">Download Cleaned Data as PDF</a>'
-
-        st.markdown(csv_button, unsafe_allow_html=True)
+        
         st.markdown(pdf_button, unsafe_allow_html=True)
 
-        st.write("The shape of the data: Column 1, Row 0")
-        st.table(df.shape)
+        shape_data = pd.DataFrame({
+            'Description': ['features', 'rows'],
+            'Count': [df.shape[1], df.shape[0]]
+        })
+
+        st.table(shape_data)
 
         st.markdown("**Let's Begin Data Visualization!**")
         lottie_coding = load_lottiefile("amine.json")
@@ -266,7 +292,7 @@ def main():
             return df.select_dtypes(include=[np.number]).columns.tolist()
 
         with st.expander("Numeric Data"):
-            # ... Numeric Data Visualization
+            # Numeric Data Visualization
             st.title("Numeric Data")
             st.markdown("""
             Numeric data refers to variables that contain numerical values. These are typically represented by **integers** (`int`) and **floating-point numbers** (`float`). The distinction is important because numerical operations, analyses, or visualizations can be applied to these data types. Their numeric nature aids in obtaining meaningful insights and conducting quantitative analysis.
@@ -370,27 +396,55 @@ def main():
             if fig:
                 st.plotly_chart(fig)
 
-
         @st.cache_data
-        def compute_correlation_matrix(df, numeric_columns):
-            return df[numeric_columns].corr()
+        def compute_correlation_matrix(df, numeric_columns, method='pearson'):
+            return df[numeric_columns].corr(method=method)
 
-        st.title("Correlation Heatmap")
-        st.markdown("""
-            A correlation heatmap visualizes the correlation coefficients for different variables in a matrix format. This can be especially useful to understand the relationships between different features in the dataset.
-        """)
+        with st.expander("Correlation Matrix"):
+            st.title("Correlation Heatmap")
+            st.markdown("""
+                A correlation heatmap visualizes the correlation coefficients for different variables in a matrix format. This can be especially useful to understand the relationships between different features in the dataset.
+            """)
 
-        # Use the cached function to get the correlation matrix
-        correlation_matrix = compute_correlation_matrix(df, numeric_columns)
+            # Tooltips for each correlation method
+            tooltips = {
+                "pearson": "Measures the linear relationship between two datasets. Suitable for continuous, normally distributed data.",
+                "kendall": "A measure of rank correlation. Calculates the difference between the concordant and discordant pairs of data.",
+                "spearman": "Measures the strength and direction of the monotonic relationship between two paired datasets. It's based on the ranked values of the data."
+            }
 
-        # Plot heatmap
-        heatmap_fig = px.imshow(correlation_matrix, 
-                                x=correlation_matrix.columns, 
-                                y=correlation_matrix.columns,
-                                labels=dict(color="Correlation coefficient"),
-                                title="Feature Correlation Heatmap"
-                                )
-        st.plotly_chart(heatmap_fig)
+            correlation_methods = ["pearson", "kendall", "spearman"]
+
+            # Create dropdown with tooltips
+            options = [f"{method} 🛈" for method in correlation_methods]
+            selected_option = st.selectbox("Select Correlation Method", options, index=0)
+            selected_method = selected_option.split()[0]  # Extracting the actual method without the icon
+
+            # Displaying the tooltip for the selected method
+            st.markdown(f'<span title="{tooltips[selected_method]}">{selected_method.capitalize()}</span>', unsafe_allow_html=True)
+
+            # Slider for threshold
+            threshold = st.slider("Set correlation threshold to highlight", 0.0, 1.0, 0.7)
+
+            # Use the cached function to get the correlation matrix
+            correlation_matrix = compute_correlation_matrix(df, numeric_columns, method=selected_method)
+
+            # Highlight only correlations above or below the threshold
+            highlighted_corr = correlation_matrix.mask((correlation_matrix < threshold) & (correlation_matrix > -threshold))
+
+            # Plot heatmap with annotations for the highlighted correlations
+            heatmap_fig = px.imshow(
+                highlighted_corr,
+                x=correlation_matrix.columns,
+                y=correlation_matrix.columns,
+                labels=dict(color="Correlation coefficient"),
+                title="Feature Correlation Heatmap",
+                color_continuous_scale="RdBu_r",  # Blue to red color scale
+                zmin=-1,  # Minimum correlation value
+                zmax=1   # Maximum correlation value
+            )
+
+            st.plotly_chart(heatmap_fig)
 
         @st.cache_data
         def process_time_features(df, selected_date_col):
@@ -401,33 +455,35 @@ def main():
             df['Year'] = df[selected_date_col].dt.year
             return df
 
-        # Checking if there's a datetime column in the dataset
-        date_cols = df.select_dtypes(include=[np.datetime64]).columns.tolist()
+        with st.expander("Time series analysis"):
+            # Checking if there's a datetime column in the dataset
+            date_cols = df.select_dtypes(include=[np.datetime64]).columns.tolist()
 
-        if date_cols:
-            if st.button("Time Series Analysis"):
+            if date_cols:
+                if st.button("Time Series Analysis"):
             
-                # Ensure columns are of type datetime64
-                for col in date_cols:
-                    df[col] = pd.to_datetime(df[col])
+                    # Ensure columns are of type datetime64
+                    for col in date_cols:
+                        df[col] = pd.to_datetime(df[col])
 
-                # Extract day, month, month-year, and year features using the cached function
-                selected_date_col = st.selectbox("Select a datetime column for analysis", date_cols)
-                df = process_time_features(df, selected_date_col)
+                    # Extract day, month, month-year, and year features using the cached function
+                    selected_date_col = st.selectbox("Select a datetime column for analysis", date_cols)
+                    df = process_time_features(df, selected_date_col)
 
-                time_feature = st.selectbox("Select a time feature for visualization", ["Day", "Month", "Month-Year", "Year"])
+                    time_feature = st.selectbox("Select a time feature for visualization", ["Day", "Month", "Month-Year", "Year"])
 
-                # Line graph visualization
-                fig = px.line(df, x=selected_date_col, y=time_feature, title=f"Time Series Analysis of {time_feature}")
-                st.plotly_chart(fig)
+                    # Line graph visualization
+                    fig = px.line(df, x=selected_date_col, y=time_feature, title=f"Time Series Analysis of {time_feature}")
+                    st.plotly_chart(fig)
 
-        else:
-            st.warning("No datetime column found in the dataset for time series analysis.")
+            else:
+                st.warning("No datetime column found in the dataset for time series analysis.")
 
-
+                
         with st.expander("Feedback"):
-            # Feedback section
+
             st.subheader("Provide Feedback")
+
             feedback = st.text_area("Feedback:")
             email = st.text_input("Email:")
 
@@ -460,6 +516,8 @@ st.sidebar.title("Authentication")
 
 # If user is not logged in, display the login form.
 if not st.session_state['logged_in']:
+    # Display the image
+    st.image("data.png", caption="Data Manager 1.0.5", use_column_width=True)
     entered_username = st.sidebar.text_input("Username")
     entered_password = st.sidebar.text_input("Password", type="password")
 
