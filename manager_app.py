@@ -171,10 +171,9 @@ def main():
 
     st.sidebar.subheader("New Update")
     st.sidebar.write("""
-    1. PDF uploader
-    2. Function expander
-    3. App optimization
-    4. Dynamic correlation matrix
+    1. App optimization
+    2. Dynamic correlation matrix
+    3. Time series bug fixed
     """)
 
     st.sidebar.subheader("Version 1.2 coming soon")
@@ -480,16 +479,16 @@ def main():
                 # Using radio button for time feature selection and updating session state
                 st.session_state['time_feature'] = st.radio("Select a time feature for visualization", ["Day", "Month", "Month-Year", "Year"], index=["Day", "Month", "Month-Year", "Year"].index(st.session_state['time_feature']))
 
-                if st.button("Time Series Analysis"):
-                    if st.session_state['time_feature'] != 'Month-Year':
-                        aggregated_data = df.groupby(st.session_state['time_feature']).size().reset_index(name='Count')
-                    else:
-                        # Special handling for "Month-Year" to aggregate and maintain the chronological order
-                        aggregated_data = df.groupby(st.session_state['time_feature']).size().reset_index(name='Count')
-                        aggregated_data = aggregated_data.sort_values(by=st.session_state['time_feature'])
 
-                    fig = px.line(aggregated_data, x=st.session_state['time_feature'], y='Count', title=f"Time Series Analysis of {st.session_state['time_feature']}")
-                    st.plotly_chart(fig)
+                if st.session_state['time_feature'] != 'Month-Year':
+                    aggregated_data = df.groupby(st.session_state['time_feature']).size().reset_index(name='Count')
+                else:
+                    # Special handling for "Month-Year" to aggregate and maintain the chronological order
+                    aggregated_data = df.groupby(st.session_state['time_feature']).size().reset_index(name='Count')
+                    aggregated_data = aggregated_data.sort_values(by=st.session_state['time_feature'])
+
+                fig = px.line(aggregated_data, x=st.session_state['time_feature'], y='Count', title=f"Time Series Analysis of {st.session_state['time_feature']}")
+                st.plotly_chart(fig)
 
             else:
                 st.warning("No potential datetime column found in the dataset for time series analysis.")
