@@ -230,13 +230,34 @@ def main():
             df = handle_outliers(df, method="winsorize")
 
         # Advanced Imputation
-        advanced_impute_method = st.selectbox("Choose an advanced imputation method", ["None", "KNN", "Iterative"])
-        if advanced_impute_method != "None":
-            df = advanced_imputation(df, method=advanced_impute_method)
+        # If 'advanced_impute_method' and 'cleaning_method' are not in session_state, initialize them
+        if 'advanced_impute_method' not in st.session_state:
+            st.session_state['advanced_impute_method'] = "None"
+
+        if 'cleaning_method' not in st.session_state:
+            st.session_state['cleaning_method'] = "None"
+
+        # Use selectbox for 'advanced_impute_method' and store the value in a temporary variable
+        selected_advanced_impute = st.selectbox("Choose an advanced imputation method", ["None", "KNN", "Iterative"], index=["None", "KNN", "Iterative"].index(st.session_state['advanced_impute_method']))
+
+        # If there's a change in selection for 'advanced_impute_method', update the session_state and rerun the app
+        if selected_advanced_impute != st.session_state['advanced_impute_method']:
+            st.session_state['advanced_impute_method'] = selected_advanced_impute
+            st.experimental_rerun()
+
+        if st.session_state['advanced_impute_method'] != "None":
+            df = advanced_imputation(df, method=st.session_state['advanced_impute_method'])
         else:
-            # Your existing cleaning methods
-            cleaning_method = st.selectbox("Choose a method to clean the data", ["None", "Median", "Mean", "Most Frequent"])
-            df = clean_data(df, cleaning_method)
+            # Use selectbox for 'cleaning_method' and store the value in a temporary variable
+            selected_cleaning_method = st.selectbox("Choose a method to clean the data", ["None", "Median", "Mean", "Most Frequent"], index=["None", "Median", "Mean", "Most Frequent"].index(st.session_state['cleaning_method']))
+
+            # If there's a change in selection for 'cleaning_method', update the session_state and rerun the app
+            if selected_cleaning_method != st.session_state['cleaning_method']:
+                st.session_state['cleaning_method'] = selected_cleaning_method
+                st.experimental_rerun()
+
+            df = clean_data(df, st.session_state['cleaning_method'])
+
         # Displaying unique values for each column
         unique_counts = df.nunique()
         unique_df = pd.DataFrame({
@@ -244,9 +265,7 @@ def main():
             'Unique Values': unique_counts.values
         })
 
-        st.write("Number of Unique Values for Each Feature:")
-        st.table(unique_df)
-
+        
         # Create buttons using the correct links
         csv_href = create_download_link(df, "csv")
         csv_button = f'<a href="{csv_href}" download="cleaned_data.csv" class="btn btn-outline-primary btn-sm">Download Cleaned Data as CSV</a>'
