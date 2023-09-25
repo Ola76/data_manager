@@ -172,12 +172,12 @@ def main():
     st.sidebar.subheader("New Update")
     st.sidebar.write("""
     1. PDF uploader
-    2. Collapsed data visualization
-    3. Cache run time
+    2. Function expander
+    3. App optimization
     4. Dynamic correlation matrix
     """)
 
-    st.sidebar.subheader("Version 1.1.1 coming soon")
+    st.sidebar.subheader("Version 1.2 coming soon")
     st.sidebar.write("""
     1. Authentication development
     2. Dynamic feedback loop
@@ -447,39 +447,54 @@ def main():
             st.plotly_chart(heatmap_fig)
 
         @st.cache_data
+        def try_convert_to_datetime(col):
+            try:
+                return pd.to_datetime(col, format='%d%m%Y')
+            except:
+                return col
+
+        @st.cache_data
         def process_time_features(df, selected_date_col):
             df = df.copy()  # Clone the dataframe to avoid in-place modifications
             df['Day'] = df[selected_date_col].dt.day
             df['Month'] = df[selected_date_col].dt.month
-            df['Month-Year'] = df[selected_date_col].dt.to_period('M')
-            df['Year'] = df[selected_date_col].dt.year
+            df['Month-Year'] = df[selected_date_col].dt.strftime('%b-%Y')  # Converts to "Mon-YYYY" format
+            df['Year'] = df[selected_date_col].dt.year.astype(str)  # Convert year to string
             return df
+
+        # Attempt to convert potential date columns to datetime format
+        df = df.apply(try_convert_to_datetime)
 
         with st.expander("Time series analysis"):
             # Checking if there's a datetime column in the dataset
             date_cols = df.select_dtypes(include=[np.datetime64]).columns.tolist()
 
             if date_cols:
+                if not 'time_feature' in st.session_state:
+                    st.session_state['time_feature'] = "Day"  # Default value
+
+                # Extract day, month, month-year, and year features using the cached function
+                selected_date_col = st.selectbox("Select a column to analyze time series", date_cols)
+                df = process_time_features(df, selected_date_col)
+
+                # Using radio button for time feature selection and updating session state
+                st.session_state['time_feature'] = st.radio("Select a time feature for visualization", ["Day", "Month", "Month-Year", "Year"], index=["Day", "Month", "Month-Year", "Year"].index(st.session_state['time_feature']))
+
                 if st.button("Time Series Analysis"):
-            
-                    # Ensure columns are of type datetime64
-                    for col in date_cols:
-                        df[col] = pd.to_datetime(df[col])
+                    if st.session_state['time_feature'] != 'Month-Year':
+                        aggregated_data = df.groupby(st.session_state['time_feature']).size().reset_index(name='Count')
+                    else:
+                        # Special handling for "Month-Year" to aggregate and maintain the chronological order
+                        aggregated_data = df.groupby(st.session_state['time_feature']).size().reset_index(name='Count')
+                        aggregated_data = aggregated_data.sort_values(by=st.session_state['time_feature'])
 
-                    # Extract day, month, month-year, and year features using the cached function
-                    selected_date_col = st.selectbox("Select a datetime column for analysis", date_cols)
-                    df = process_time_features(df, selected_date_col)
-
-                    time_feature = st.selectbox("Select a time feature for visualization", ["Day", "Month", "Month-Year", "Year"])
-
-                    # Line graph visualization
-                    fig = px.line(df, x=selected_date_col, y=time_feature, title=f"Time Series Analysis of {time_feature}")
+                    fig = px.line(aggregated_data, x=st.session_state['time_feature'], y='Count', title=f"Time Series Analysis of {st.session_state['time_feature']}")
                     st.plotly_chart(fig)
 
             else:
-                st.warning("No datetime column found in the dataset for time series analysis.")
+                st.warning("No potential datetime column found in the dataset for time series analysis.")
 
-                
+
         with st.expander("Feedback"):
 
             st.subheader("Provide Feedback")
