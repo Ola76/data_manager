@@ -193,14 +193,18 @@ def main():
 
         # Call the cleaning function
         df = clean_categorical_data(df)
+
+        # Initialize the session state if it doesn't exist
         if 'columns_to_drop' not in st.session_state:
             st.session_state.columns_to_drop = []
 
-        # Display multiselect for dropping columns
-        columns_to_drop = st.multiselect("Select columns to drop", df.columns, st.session_state.columns_to_drop)
+        # Use multiselect for dropping columns and store the value in a temporary variable
+        selected_columns_to_drop = st.multiselect("Select columns to drop", df.columns, st.session_state.columns_to_drop)
 
-        # Update the session state
-        st.session_state.columns_to_drop = columns_to_drop
+        # If there's a change in selection, update the session_state and rerun the app
+        if set(selected_columns_to_drop) != set(st.session_state.columns_to_drop):
+            st.session_state.columns_to_drop = selected_columns_to_drop
+            st.experimental_rerun()
 
         # Drop the selected columns
         df = df.drop(columns=st.session_state.columns_to_drop)
@@ -477,21 +481,26 @@ def main():
                 df = process_time_features(df, selected_date_col)
 
                 # Using radio button for time feature selection and updating session state
-                st.session_state['time_feature'] = st.radio("Select a time feature for visualization", ["Day", "Month", "Month-Year", "Year"], index=["Day", "Month", "Month-Year", "Year"].index(st.session_state['time_feature']))
-
+                chosen_time_feature = st.radio("Select a time feature for visualization", ["Day", "Month", "Month-Year", "Year"])
+        
+                # If the chosen time feature changes, update the session state
+                if st.session_state['time_feature'] != chosen_time_feature:
+                    st.session_state['time_feature'] = chosen_time_feature
+                    st.experimental_rerun()
 
                 if st.session_state['time_feature'] != 'Month-Year':
                     aggregated_data = df.groupby(st.session_state['time_feature']).size().reset_index(name='Count')
                 else:
-                    # Special handling for "Month-Year" to aggregate and maintain the chronological order
-                    aggregated_data = df.groupby(st.session_state['time_feature']).size().reset_index(name='Count')
-                    aggregated_data = aggregated_data.sort_values(by=st.session_state['time_feature'])
+                    # Special handling for "Month-Year"
+                    aggregated_data = df.groupby([st.session_state['time_feature'], selected_date_col]).size().reset_index(name='Count').sort_values(by=selected_date_col)
+                    aggregated_data = aggregated_data.drop(columns=selected_date_col)  # Drop the original datetime column after sorting
 
                 fig = px.line(aggregated_data, x=st.session_state['time_feature'], y='Count', title=f"Time Series Analysis of {st.session_state['time_feature']}")
                 st.plotly_chart(fig)
 
             else:
                 st.warning("No potential datetime column found in the dataset for time series analysis.")
+
 
 
         with st.expander("Feedback"):
