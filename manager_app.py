@@ -15,7 +15,6 @@ from sklearn.experimental import enable_iterative_imputer
 from sklearn.impute import KNNImputer, IterativeImputer
 from fpdf import FPDF
 from io import BytesIO
-from dotenv import load_dotenv
 import yagmail
 
 def load_lottiefile(filepath: str):
@@ -28,14 +27,10 @@ def check_credentials(username, password):
         return True
     return False
 
-# Load environment variables from .env.txt
-load_dotenv(".env.txt")
-
-# Get the email password from the environment variable
-EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
-
-yagmail.register('danieljjj32@gmail.com', EMAIL_PASSWORD)
+email_password = st.secrets["general"]["email_password"]
+yagmail.register('danieljjj32@gmail.com', email_password)
 yag = yagmail.SMTP('danieljjj32@gmail.com')
+
 
 def send_email(feedback_data):
     subject = "New Feedback Received"
