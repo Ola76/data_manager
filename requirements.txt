@@ -11,3 +11,4 @@ openpyxl==3.1.2
 streamlit_lottie==0.0.5
 yagmail==0.15.293
 python-dotenv==1.0.0
+keyring==24.2.0
