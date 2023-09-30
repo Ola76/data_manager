@@ -10,3 +10,4 @@ tabula-py==2.8.1
 openpyxl==3.1.2
 streamlit_lottie==0.0.5
 yagmail==0.15.293
+dotenv==1.0.0
