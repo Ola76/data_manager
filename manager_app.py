@@ -15,6 +15,8 @@ from sklearn.experimental import enable_iterative_imputer
 from sklearn.impute import KNNImputer, IterativeImputer
 from fpdf import FPDF
 from io import BytesIO
+from dotenv import load_dotenv
+import yagmail
 
 def load_lottiefile(filepath: str):
     with open (filepath, "r") as f:
@@ -25,6 +27,28 @@ def check_credentials(username, password):
     if username == "admin" and password == "password123":
         return True
     return False
+
+# Load environment variables from .env.txt
+load_dotenv(".env.txt")
+
+# Get the email password from the environment variable
+EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
+
+yag = yagmail.SMTP('danieljjj32@gmail.com', EMAIL_PASSWORD)
+
+def send_email(feedback_data):
+    subject = "New Feedback Received"
+    content = f"""
+    Timestamp: {feedback_data['timestamp'][0]}
+    Email: {feedback_data['email'][0]}
+    Feedback: {feedback_data['feedback'][0]}
+    """
+    yag.send(
+    to='danieljjj32@gmail.com',
+    subject=subject,
+    contents=content,
+    headers={'Reply-To': feedback_data['email'][0]}
+)
 
 @st.cache_data
 def load_data(file):
@@ -174,14 +198,14 @@ def main():
     1. App optimization
     2. Dynamic correlation matrix
     3. Time series bug fixed
+    4. Dynamic feedback loop
     """)
 
     st.sidebar.subheader("Version 1.2 coming soon")
     st.sidebar.write("""
     1. Authentication development
-    2. Dynamic feedback loop
-    3. Machine learning models
-    4. Prediction and Validation
+    2. Machine learning models
+    3. Prediction and Validation
     """)
 
     st.sidebar.write("Many more to come.")
@@ -520,35 +544,62 @@ def main():
             else:
                 st.warning("No potential datetime column found in the dataset for time series analysis.")
 
+        # Introduce a new session state variable for tracking feedback submission
+        if 'feedback_submitted' not in st.session_state:
+            st.session_state.feedback_submitted = False
 
+        if 'feedback' not in st.session_state:
+            st.session_state.feedback = ''
+        if 'email' not in st.session_state:
+            st.session_state.email = ''
 
         with st.expander("Feedback"):
-
             st.subheader("Provide Feedback")
 
-            feedback = st.text_area("Feedback:")
-            email = st.text_input("Email:")
+            # Check if feedback has been submitted
+            if st.session_state.feedback_submitted:
+                st.write("Thank you for your feedback!")
+            else:
+                # Use session_state for the input fields
+                feedback = st.text_area("Feedback:", value=st.session_state.feedback)
+                st.session_state.feedback = feedback  # Update session_state with the current input
+        
+                email = st.text_input("Email:", value=st.session_state.email)
+                st.session_state.email = email  # Update session_state with the current input
 
-            if st.button("Submit Feedback"):
-            # Get the current timestamp
-                current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                if st.button("Submit Feedback"):
+                    # Get the current timestamp
+                    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-                # Create a DataFrame with feedback data
-                feedback_data = pd.DataFrame({
-                    "timestamp": [current_time],
-                    "email": [email],
-                    "feedback": [feedback]
-                })  
+                    # Create a DataFrame with feedback data
+                    feedback_data = pd.DataFrame({
+                        "timestamp": [current_time],
+                        "email": [st.session_state.email],
+                        "feedback": [st.session_state.feedback]
+                    })
 
-            # If feedbacks.csv exists, append the data, otherwise create a new file
-                try:
-                    existing_feedback = pd.read_csv("feedbacks.csv")
-                    all_feedback = pd.concat([existing_feedback, feedback_data])
-                    all_feedback.to_csv("feedbacks.csv", index=False)
-                except FileNotFoundError:
-                    feedback_data.to_csv("feedbacks.csv", index=False)
+                    # If feedbacks.csv exists, append the data, otherwise create a new file
+                    try:
+                        existing_feedback = pd.read_csv("feedbacks.csv")
+                        all_feedback = pd.concat([existing_feedback, feedback_data])
+                        all_feedback.to_csv("feedbacks.csv", index=False)
+                    except FileNotFoundError:
+                        feedback_data.to_csv("feedbacks.csv", index=False)
 
-                st.success("Thank you for your feedback!")
+                    # Send the feedback data via email
+                    send_email(feedback_data)
+
+                    st.success("Thank you for your feedback!")
+
+                    # Set feedback_submitted to True after successful feedback processing
+                    st.session_state.feedback_submitted = True
+
+                    # Reset session state variables
+                    st.session_state.feedback = ''
+                    st.session_state.email = ''
+                
+                    # Rerun the app to reset the input widgets
+                    st.experimental_rerun()
 
 # Initialize session state for login status.
 if 'logged_in' not in st.session_state:
