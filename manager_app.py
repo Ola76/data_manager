@@ -16,6 +16,12 @@ from sklearn.impute import KNNImputer, IterativeImputer
 from fpdf import FPDF
 from io import BytesIO
 import yagmail
+import keyring
+from keyring.backends import null
+
+# Set the keyring backend to a dummy backend that does nothing
+keyring.set_keyring(null.Keyring())
+
 
 def load_lottiefile(filepath: str):
     with open (filepath, "r") as f:
@@ -28,8 +34,7 @@ def check_credentials(username, password):
     return False
 
 email_password = st.secrets["general"]["email_password"]
-yagmail.register('danieljjj32@gmail.com', email_password)
-yag = yagmail.SMTP('danieljjj32@gmail.com')
+yag = yagmail.SMTP('danieljjj32@gmail.com', email_password)
 
 
 def send_email(feedback_data):
