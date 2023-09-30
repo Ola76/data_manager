@@ -34,7 +34,8 @@ load_dotenv(".env.txt")
 # Get the email password from the environment variable
 EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
 
-yag = yagmail.SMTP('danieljjj32@gmail.com', EMAIL_PASSWORD)
+yagmail.register('danieljjj32@gmail.com', EMAIL_PASSWORD)
+yag = yagmail.SMTP('danieljjj32@gmail.com')
 
 def send_email(feedback_data):
     subject = "New Feedback Received"
