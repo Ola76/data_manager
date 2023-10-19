@@ -189,7 +189,7 @@ def main():
 
     st.sidebar.subheader("New Update")
     st.sidebar.write("""
-    1. AgGrid
+    1. AgGrid dataframe
     2. Dynamic correlation matrix
     3. Time series bug fixed
     4. Dynamic feedback loop

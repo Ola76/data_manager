@@ -1,5 +1,4 @@
 fpdf==1.7.2
-matplotlib==3.8.0
 numpy==1.25.2  # This was installed earlier
 pandas==2.1.0
 plotly==5.16.1
