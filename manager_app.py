@@ -3,10 +3,9 @@ import pandas as pd
 import plotly.express as px
 import numpy as np
 import os
-import matplotlib.pyplot as plt
 import base64
-import io
 import json
+from st_aggrid import AgGrid
 from streamlit_lottie import st_lottie
 from datetime import datetime
 from tabula import read_pdf
@@ -14,14 +13,12 @@ from scipy.stats import mstats
 from sklearn.experimental import enable_iterative_imputer
 from sklearn.impute import KNNImputer, IterativeImputer
 from fpdf import FPDF
-from io import BytesIO
 import yagmail
 import keyring
 from keyring.backends import null
 
 # Set the keyring backend to a dummy backend that does nothing
 keyring.set_keyring(null.Keyring())
-
 
 def load_lottiefile(filepath: str):
     with open (filepath, "r") as f:
@@ -35,7 +32,6 @@ def check_credentials(username, password):
 
 email_password = st.secrets["general"]["email_password"]
 yag = yagmail.SMTP('danieljjj32@gmail.com', email_password)
-
 
 def send_email(feedback_data):
     subject = "New Feedback Received"
@@ -89,7 +85,6 @@ def load_data(file):
 def clean_categorical_data(df):
     # Select only the categorical columns
     cat_columns = df.select_dtypes(['object']).columns
-
     # Clean the categorical columns
     for col in cat_columns:
         # Strip white spaces
@@ -106,10 +101,8 @@ def handle_outliers(df, method="winsorize", limits=(0.01, 0.01)):
     if method == "winsorize":
         for col in numeric_cols:
             df[col] = mstats.winsorize(df[col], limits=limits)
-        
         # Provide the Winsorize explanation
         st.markdown('<span title="Winsorizing is a method to limit extreme values in the data. Values more extreme than a specified range will be replaced with the nearest boundary value.">Winsorize 🛈</span>', unsafe_allow_html=True)
-
     return df
 
 @st.cache_data
@@ -153,7 +146,7 @@ def dataframe_to_pdf(df):
 
     pdf.ln(row_height)
 
-    for index, row in df.iterrows():
+    for row in df.iterrows():
         for item in row:
             pdf.cell(col_width, row_height, str(item), border=1)
         pdf.ln(row_height)
@@ -188,7 +181,7 @@ def main():
 
         Once you've set everything, sit back and let us refine your data. But that's not all – our integrated visualization suite provides instant insights into the heart of your cleaned dataset. Embark on a data cleaning journey like never before! 
         
-        Application by Oburoh.
+        Application by [Oburoh](https://github.com/Ola76).
         """)
     
     # Display the image
@@ -196,7 +189,7 @@ def main():
 
     st.sidebar.subheader("New Update")
     st.sidebar.write("""
-    1. App optimization
+    1. AgGrid
     2. Dynamic correlation matrix
     3. Time series bug fixed
     4. Dynamic feedback loop
@@ -235,7 +228,8 @@ def main():
         df = df.drop(columns=st.session_state.columns_to_drop)
 
         # Display the dataframe
-        st.write(df)
+        AgGrid(df, height=300)
+
         # Calculate the number of missing values for each feature
         missing_values = df.isnull().sum()
 
