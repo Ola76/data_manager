@@ -5,7 +5,6 @@ import numpy as np
 import os
 import base64
 import json
-from st_aggrid import AgGrid
 from streamlit_lottie import st_lottie
 from datetime import datetime
 from tabula import read_pdf
@@ -189,10 +188,9 @@ def main():
 
     st.sidebar.subheader("New Update")
     st.sidebar.write("""
-    1. AgGrid dataframe
-    2. Dynamic correlation matrix
-    3. Time series bug fixed
-    4. Dynamic feedback loop
+    1. Dynamic correlation matrix
+    2. Time series bug fixed
+    3. Dynamic feedback loop
     """)
 
     st.sidebar.subheader("Version 1.2 coming soon")
@@ -228,7 +226,7 @@ def main():
         df = df.drop(columns=st.session_state.columns_to_drop)
 
         # Display the dataframe
-        AgGrid(df, height=300)
+        st.dataframe(df, height=300)
 
         # Calculate the number of missing values for each feature
         missing_values = df.isnull().sum()
