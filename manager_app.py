@@ -220,13 +220,13 @@ def main():
         # If there's a change in selection, update the session_state and rerun the app
         if set(selected_columns_to_drop) != set(st.session_state.columns_to_drop):
             st.session_state.columns_to_drop = selected_columns_to_drop
-            st.experimental_rerun()
+            st.rerun()
 
         # Drop the selected columns
         df = df.drop(columns=st.session_state.columns_to_drop)
 
         # Display the dataframe
-        st.dataframe(df, height=300)
+        st.data_editor(df, height=300)
 
         # Calculate the number of missing values for each feature
         missing_values = df.isnull().sum()
@@ -260,7 +260,7 @@ def main():
         # If there's a change in selection for 'advanced_impute_method', update the session_state and rerun the app
         if selected_advanced_impute != st.session_state['advanced_impute_method']:
             st.session_state['advanced_impute_method'] = selected_advanced_impute
-            st.experimental_rerun()
+            st.rerun()
 
         if st.session_state['advanced_impute_method'] != "None":
             df = advanced_imputation(df, method=st.session_state['advanced_impute_method'])
@@ -271,7 +271,7 @@ def main():
             # If there's a change in selection for 'cleaning_method', update the session_state and rerun the app
             if selected_cleaning_method != st.session_state['cleaning_method']:
                 st.session_state['cleaning_method'] = selected_cleaning_method
-                st.experimental_rerun()
+                st.rerun()
 
             df = clean_data(df, st.session_state['cleaning_method'])
 
@@ -522,7 +522,7 @@ def main():
                 # If the chosen time feature changes, update the session state
                 if st.session_state['time_feature'] != chosen_time_feature:
                     st.session_state['time_feature'] = chosen_time_feature
-                    st.experimental_rerun()
+                    st.rerun()
 
                 if st.session_state['time_feature'] != 'Month-Year':
                     aggregated_data = df.groupby(st.session_state['time_feature']).size().reset_index(name='Count')
@@ -592,7 +592,7 @@ def main():
                     st.session_state.email = ''
                 
                     # Rerun the app to reset the input widgets
-                    st.experimental_rerun()
+                    st.rerun()
 
 # Initialize session state for login status.
 if 'logged_in' not in st.session_state:
@@ -610,7 +610,7 @@ if not st.session_state['logged_in']:
     if st.sidebar.button("Login"):
         if check_credentials(entered_username, entered_password):
             st.session_state['logged_in'] = True
-            st.experimental_rerun()  # Rerun the app to refresh the sidebar
+            st.rerun()  # Rerun the app to refresh the sidebar
         else:
             st.sidebar.error("Invalid credentials")
 else:
@@ -619,4 +619,4 @@ else:
     
     if st.sidebar.button("Logout"):
         st.session_state['logged_in'] = False
-        st.experimental_rerun()  # Rerun the app to refresh the sidebar
+        st.rerun()  # Rerun the app to refresh the sidebar
