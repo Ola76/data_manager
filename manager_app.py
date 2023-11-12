@@ -7,11 +7,9 @@ import base64
 import json
 from streamlit_lottie import st_lottie
 from datetime import datetime
-from tabula import read_pdf
 from scipy.stats import mstats
 from sklearn.experimental import enable_iterative_imputer
 from sklearn.impute import KNNImputer, IterativeImputer
-from fpdf import FPDF
 import yagmail
 import keyring
 from keyring.backends import null
@@ -53,29 +51,6 @@ def load_data(file):
         return pd.read_csv(file)
     elif file_extension in [".xlsx", ".xls"]:
         return pd.read_excel(file)
-    elif file_extension == ".pdf":
-        # Using tabula to read tables from PDF
-        dfs = read_pdf(file, pages='all', multiple_tables=True)
-        if dfs:
-            # If there's only one table, return it
-            if len(dfs) == 1:
-                return dfs[0]
-            # If there are multiple tables, ask the user which one(s) they want
-            else:
-                options = [f"Table {i}" for i in range(1, len(dfs) + 1)] + ["All"]
-                selected_option = st.selectbox(
-                    "Multiple tables detected. Please select the table you want to load:",
-                    options=options
-                )                
-                if selected_option == "All":
-                    # Concatenate all tables vertically
-                    return pd.concat(dfs, ignore_index=True)
-                else:
-                    table_index = options.index(selected_option)
-                    return dfs[table_index]
-        else:
-            st.error("No tables found in PDF!")
-            return None
     else:
         st.error("Unsupported file format!")
         return None
@@ -130,38 +105,14 @@ def clean_data(df, method):
         return df.apply(lambda x: x.fillna(x.value_counts().index[0]) if x.dtype == "O" else x.fillna(x.mode()[0]), axis=0)
     return df  # if method is "None", return the original data
 
-def dataframe_to_pdf(df):
-    pdf = FPDF()
-    pdf.add_page()
-    
-    # Set font for the PDF
-    pdf.set_font("Arial", size=8)
-    page_width = pdf.w - 2 * pdf.l_margin
-    col_width = page_width/len(df.columns)
-    row_height = 8 * 1.5
-
-    for col in df.columns:
-        pdf.cell(col_width, row_height, col, border=1)
-
-    pdf.ln(row_height)
-
-    for row in df.iterrows():
-        for item in row:
-            pdf.cell(col_width, row_height, str(item), border=1)
-        pdf.ln(row_height)
-
-    # Convert PDF into bytes string and return
-    return pdf.output(dest='S').encode('latin1')
-
 def create_download_link(df, download_format="csv"):
     if download_format == "csv":
         csv = df.to_csv(index=False)
         b64 = base64.b64encode(csv.encode()).decode()  
         href = f'data:file/csv;base64,{b64}'
-    elif download_format == "pdf":
-        pdf_data = dataframe_to_pdf(df)
-        b64 = base64.b64encode(pdf_data).decode()
-        href = f'data:file/pdf;base64,{b64}'
+    else:
+        st.error("Unsupported download format!")
+        return None  # or provide an appropriate fallback behavior
     return href
     
 def main():
@@ -170,7 +121,7 @@ def main():
     st.write("""
         Welcome to our Advanced Data Cleaning & Visualization Hub! Here's a curated journey of the features we've built for you:
 
-        1. **Dataset Uploader**: Begin by uploading your dataset. We accept CSV, Excel, and even PDF formats. Dive into the smooth integration of your data with our state-of-the-art uploader.
+        1. **Dataset Uploader**: Begin by uploading your dataset. We accept CSV,  and Excel formats. Dive into the smooth integration of your data with our state-of-the-art uploader.
 
         2. **Tackle Outliers (For Numeric Data)**: Outliers can skew results. Especially built for numerical data, our tools, including the 'Winsorize' method, strategically adjust these data points to ensure they don't misrepresent statistical analyses.
 
@@ -210,6 +161,9 @@ def main():
         # Call the cleaning function
         df = clean_categorical_data(df)
 
+        # Display a success message
+        st.success("File uploaded successfully!")
+
         # Initialize the session state if it doesn't exist
         if 'columns_to_drop' not in st.session_state:
             st.session_state.columns_to_drop = []
@@ -229,15 +183,15 @@ def main():
         st.data_editor(df, height=300)
 
         # Calculate the number of missing values for each feature
-        missing_values = df.isnull().sum()
+        missing_values_before = df.isnull().sum()
 
         # Filter out features without missing values
-        missing_values = missing_values[missing_values > 0]
+        missing_values_before = missing_values_before[missing_values_before > 0]
 
         # Display missing values
-        if not missing_values.empty:
+        if not missing_values_before.empty:
             st.write("Number of missing values for each feature:")
-            st.write(missing_values)
+            st.write(missing_values_before)
         else:
             st.write("No missing values detected in the dataset!")
 
@@ -255,10 +209,10 @@ def main():
             st.session_state['cleaning_method'] = "None"
 
         # Use selectbox for 'advanced_impute_method' and store the value in a temporary variable
-        selected_advanced_impute = st.selectbox("Choose an advanced imputation method", ["None", "KNN", "Iterative"], index=["None", "KNN", "Iterative"].index(st.session_state['advanced_impute_method']))
+        selected_advanced_impute = st.selectbox("Choose an advanced imputation method", ["None", "KNN", "Iterative"], index=["None", "KNN", "Iterative"].index(st.session_state['advanced_impute_method']) if 'advanced_impute_method' in st.session_state else 0)
 
         # If there's a change in selection for 'advanced_impute_method', update the session_state and rerun the app
-        if selected_advanced_impute != st.session_state['advanced_impute_method']:
+        if selected_advanced_impute != st.session_state.get('advanced_impute_method'):
             st.session_state['advanced_impute_method'] = selected_advanced_impute
             st.rerun()
 
@@ -275,6 +229,22 @@ def main():
 
             df = clean_data(df, st.session_state['cleaning_method'])
 
+        # Calculate the number of missing values for each feature before cleaning
+        missing_values_before = df.isnull().sum()
+
+        # Calculate the number of missing values for each feature after cleaning
+        missing_values_after = df.isnull().sum()
+
+        st.write("Number of missing values after cleaning:")
+        st.write(missing_values_after[missing_values_after > 0])  # Show only columns with missing values
+
+        # Verify that there are no missing values after cleaning
+        if missing_values_after.sum() == 0:
+            st.write("No missing values detected in the dataset after cleaning!")
+        else:
+            st.write("Some missing values still exist after cleaning.")
+            # You can add further details or actions based on your requirements
+
         # Displaying unique values for each column
         unique_counts = df.nunique()
         unique_df = pd.DataFrame({
@@ -282,28 +252,31 @@ def main():
             'Unique Values': unique_counts.values
         })
 
-        
-        # Create buttons using the correct links
-        csv_href = create_download_link(df, "csv")
-        csv_button = f'<a href="{csv_href}" download="cleaned_data.csv" class="btn btn-outline-primary btn-sm">Download Cleaned Data as CSV</a>'
-
-        st.markdown(csv_button, unsafe_allow_html=True)
-
-        pdf_href = create_download_link(df, "pdf")
-        pdf_button = f'<a href="{pdf_href}" download="cleaned_data.pdf" class="btn btn-outline-secondary btn-sm">Download Cleaned Data as PDF</a>'
-        
-        st.markdown(pdf_button, unsafe_allow_html=True)
-
+        st.write('Shape of the Data')
         shape_data = pd.DataFrame({
             'Description': ['features', 'rows'],
             'Count': [df.shape[1], df.shape[0]]
         })
-
         st.table(shape_data)
 
+        # Now you can use unique_df as needed, for example, displaying it in the Streamlit app
+        st.write("Unique values for each column:")
+        st.write(unique_df)
+
+        # Create button with download link
+        csv_href = create_download_link(df, "csv")
+        csv_button = f'<a href="{csv_href}" download="cleaned_data.csv" class="btn btn-outline-primary btn-sm" role="button">Download Cleaned Data as CSV</a>'
+        st.markdown(csv_button, unsafe_allow_html=True)
+
         st.markdown("**Let's Begin Data Visualization!**")
+        # Load lottie animation
         lottie_coding = load_lottiefile("amine.json")
-        st_lottie(lottie_coding, speed=1, loop=True, quality="low")
+
+        # Center and control size using st.columns
+        col1, col2, col3 = st.columns([1, 3, 1])
+        # Display lottie animation in the center column
+        with col2:
+            st_lottie(lottie_coding, speed=1, loop=True, quality="low", width=400, height=400)
 
         @st.cache_data
         def get_categorical_columns(df):
